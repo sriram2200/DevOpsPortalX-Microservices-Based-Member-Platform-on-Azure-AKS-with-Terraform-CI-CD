@@ -1,0 +1,19 @@
+apiVersion : apps/v1
+kind: Deployment
+metadata:
+  name: memberportalui 
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: memberportalui
+  template:
+    metadata:
+      labels:
+        app: memberportalui 
+    spec:
+      containers:
+        - name: memberportalui 
+          image: demoterraacr.azurecr.io/memberportalui
+          ports:
+          - containerPort: 80
