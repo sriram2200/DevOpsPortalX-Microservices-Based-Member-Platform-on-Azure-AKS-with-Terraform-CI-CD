@@ -1,0 +1,166 @@
+# Starter pipeline
+# Start with a minimal pipeline that you can customize to build and deploy your code.
+# Add steps that build, run tests, deploy, and more:
+# https://aka.ms/yaml
+
+trigger:
+- master
+
+pool:
+  vmImage: ubuntu-latest
+parameters:
+  - name: action
+    displayName: "Terraform action"
+    type: string
+    default: "Apply"
+    values:
+      - "Apply"
+      - "Destroy"
+variables:
+
+- group: BootstrapControl    # need to add variable to control the bootstrap stage 
+- group: Terraform-SP 
+- group: infrabuild
+
+- name: tfVarsFile
+  value: 'dev.tfvars'
+
+#Bootstrap for bulding a storage to store statefile in remote location
+
+stages:
+- stage: Bootstrap
+  displayName: 'Creating Backend'
+  jobs:
+  - job: createBackend
+    displayName: 'Apply Storage Module (no backend yet)'
+    condition: eq(variables['bootstrap_done'], 'false')
+    steps:
+      - task: TerraformInstaller@1
+        inputs:
+          terraformVersion: 'latest'
+
+      - script: |
+          cd infra/bootstrap
+          terraform init -backend=false
+          terraform apply -auto-approve -var-file=dev.tfvars
+        displayName: 'Apply (Bootstrap)'
+        env:
+            ARM_CLIENT_ID: $(ARM_CLIENT_ID)
+            ARM_CLIENT_SECRET: $(ARM_CLIENT_SECRET)
+            ARM_SUBSCRIPTION_ID: $(ARM_SUBSCRIPTION_ID)
+            ARM_TENANT_ID: $(ARM_TENANT_ID)
+
+          
+# deploy infra and store state file remote location
+     
+- stage: BuildInfra
+  displayName: 'Build infra-Remote Backend'
+  dependsOn: Bootstrap
+  jobs:
+  - job: Build
+    condition: eq(variables['infrabuild'], 'false')
+    steps:
+    - task: TerraformInstaller@1
+      inputs:
+        terraformVersion: 'latest'
+    - task: TerraformTask@5
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        workingDirectory: 'infra/main'
+        backendServiceArm: 'infraConnection'
+        backendAzureRmStorageAccountName: 'infrastorage22'
+        backendAzureRmContainerName: 'infra-cont'
+        backendAzureRmKey: 'terraform.tfstate'
+      displayName: 'init Build'
+    - task: TerraformTask@5
+      inputs:
+        provider: 'azurerm'
+        command: 'validate'
+      displayName: 'validate Build'
+    - task: TerraformTask@5
+      inputs:
+        provider: 'azurerm'
+        command: 'plan'
+        workingDirectory: 'infra/main'
+        environmentServiceNameAzureRM: 'infraConnection'
+        commandOptions: '-var-file=$(tfVarsFile)'
+      displayName: 'plan Build'
+    
+    - ${{ if eq(parameters.action, 'Apply')}}:
+      - task: TerraformTask@5
+        inputs:
+          provider: 'azurerm'
+          command: 'apply'
+          workingDirectory: 'infra/main'
+          environmentServiceNameAzureRM: 'infraConnection'
+          commandOptions: '-auto-approve -var-file=$(tfVarsFile)'
+        displayName: 'apply Build'
+    - ${{ if eq(parameters.action,'Destroy')}}:
+      - task: TerraformTask@5
+        inputs:
+          provider: 'azurerm'
+          command: 'destroy'
+          workingDirectory: 'infra/main'
+          environmentServiceNameAzureRM: 'infraConnection'
+          commandOptions: '-auto-approve -var-file=$(tfVarsFile)'
+        displayName: 'Destroy Build'
+
+
+#monitoring
+
+- stage: MonitoringSetup
+  displayName: 'Monitoring Setup'
+  dependsOn: BuildInfra
+  jobs: 
+  - job: monitoringSetup
+    steps:
+    - task: TerraformInstaller@1
+      inputs:
+        terraformVersion: 'latest'
+    - task: TerraformTask@5
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        workingDirectory: 'infra/aks-monitoring'
+        backendServiceArm: 'infraConnection'
+        backendAzureRmStorageAccountName: 'infrastorage22'
+        backendAzureRmContainerName: 'infra-cont'
+        backendAzureRmKey: 'terraform.tfstate'
+      displayName: 'init Monitoring'
+    - task: TerraformTask@5
+      inputs:
+        provider: 'azurerm'
+        command: 'validate'
+      displayName: 'validate setup'
+    - task: TerraformTask@5
+      inputs:
+        provider: 'azurerm'
+        command: 'plan'
+        workingDirectory: 'infra/aks-monitoring'
+        environmentServiceNameAzureRM: 'infraConnection'
+        commandOptions: '-var-file=$(tfVarsFile)'
+      displayName: 'plan Setup'
+    
+    - task: TerraformTask@5
+      inputs:
+        provider: 'azurerm'
+        command: 'apply'
+        workingDirectory: 'infra/aks-monitoring'
+        environmentServiceNameAzureRM: 'infraConnection'
+        commandOptions: '-auto-approve -var-file=$(tfVarsFile)'
+      displayName: 'install Monitoring'
+    
+
+    
+
+
+    
+
+
+
+
+
+
+
+
