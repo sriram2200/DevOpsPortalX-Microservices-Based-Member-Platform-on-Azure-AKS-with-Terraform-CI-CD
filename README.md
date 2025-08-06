@@ -1,1 +1,1 @@
-# Member-Portal-End-to-End-Azure-AKS-Deployment-with-Terraform-CI-CD
+# Member-Portal-End-to-End-Azure-AKS-Deployment-with-Terraform-CI/CD
