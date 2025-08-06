@@ -67,3 +67,10 @@ terraform apply
 
 ![Arch](https://github.com/user-attachments/assets/fa5df1c7-6cbb-468d-af71-d023b0c4540c)
 
+## 🙋‍♂️ Author
+
+**Sasi Sriram**  
+📧 [sasisriram162005@gmail.com](mailto:sasisriram162005@gmail.com)  
+🔗 [LinkedIn](https://www.linkedin.com/in/sasisriram)  
+🔗 [GitHub](https://github.com/sriram2200)
+
